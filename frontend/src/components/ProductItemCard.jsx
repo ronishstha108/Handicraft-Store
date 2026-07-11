@@ -53,6 +53,7 @@ function ProductItemCard({ product, onAddToCart }) {
             fontWeight: "bold",
             backdropFilter: "blur(8px)"
           }}>
+            {/* ✅ Display category name here - this is the fix */}
             {product.category || "Uncategorized"}
           </span>
           {isLowStock && !isOutOfStock && (
@@ -93,6 +94,7 @@ function ProductItemCard({ product, onAddToCart }) {
         }}>
           {product.name || "Unnamed Product"}
         </h2>
+        {/* ✅ Display subcategory name here */}
         <p className="product-subcategory" style={{
           margin: "0 0 8px",
           color: "#b85c38",

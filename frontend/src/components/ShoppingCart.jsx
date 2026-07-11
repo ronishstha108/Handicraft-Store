@@ -1,5 +1,5 @@
 // frontend/src/components/ShoppingCart.jsx
-function ShoppingCart({ cart, onCheckout }) {
+function ShoppingCart({ cart, onCheckout, onRemoveFromCart, onDecreaseQuantity }) {
   const handleCheckout = () => {
     if (onCheckout) {
       onCheckout();
@@ -10,11 +10,21 @@ function ShoppingCart({ cart, onCheckout }) {
   const cartItems = cart?.items || [];
   const total = cart?.total || 0;
 
-  console.log("🛒 ShoppingCart rendered with:", {
-    items: cartItems,
-    total: total,
-    count: cart?.count
-  });
+  const handleRemove = (itemId) => {
+    if (onRemoveFromCart) {
+      onRemoveFromCart(itemId);
+    } else {
+      cart.removeItem(itemId);
+    }
+  };
+
+  const handleDecrease = (itemId) => {
+    if (onDecreaseQuantity) {
+      onDecreaseQuantity(itemId);
+    } else {
+      cart.decreaseItem(itemId);
+    }
+  };
 
   return (
     <section className="cart-section" aria-label="Shopping cart">
@@ -52,7 +62,7 @@ function ShoppingCart({ cart, onCheckout }) {
               </div>
               <div className="quantity-controls">
                 <button 
-                  onClick={() => cart.decreaseItem?.(item.id || item._id)}
+                  onClick={() => handleDecrease(item.id || item._id)}
                 >
                   -
                 </button>
@@ -69,7 +79,7 @@ function ShoppingCart({ cart, onCheckout }) {
               </strong>
               <button
                 className="remove-button"
-                onClick={() => cart.removeItem?.(item.id || item._id)}
+                onClick={() => handleRemove(item.id || item._id)}
               >
                 Remove
               </button>

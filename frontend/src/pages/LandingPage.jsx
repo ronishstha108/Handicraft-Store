@@ -1,18 +1,71 @@
 // frontend/src/pages/LandingPage.jsx
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import SiteHeader from "../components/SiteHeader";
-
-const categories = [
-  { name: "Basketry", icon: "🧺", description: "Handwoven baskets for every purpose" },
-  { name: "Ceramics", icon: "🏺", description: "Beautiful pottery and ceramic art" },
-  { name: "Textiles", icon: "🧵", description: "Soft fabrics and woven textiles" },
-  { name: "Woodcraft", icon: "🪵", description: "Carved wooden masterpieces" },
-  { name: "Wall Decor", icon: "🖼️", description: "Art pieces for your walls" },
-  { name: "Tableware", icon: "🍽️", description: "Elegant dining essentials" },
-];
+import { productService } from "../services/productService";
+import { categoryService } from "../services/categoryService";
+import { useShoppingCart } from "../context/ShoppingCartContext";
 
 function LandingPage() {
   const navigate = useNavigate();
+  const cart = useShoppingCart();
+  const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Load featured products
+  useEffect(() => {
+    loadFeaturedProducts();
+  }, []);
+
+  const loadFeaturedProducts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await productService.getProducts({ limit: 6, page: 1 });
+      const data = response.data || response || [];
+      
+      // Get categories for name resolution
+      const categoriesRes = await categoryService.getCategories();
+      const categoryData = categoriesRes.data || categoriesRes || [];
+      
+      // Transform products with category names
+      const transformedProducts = data.map((product) => {
+        let categoryName = product.category;
+        if (categoryName && typeof categoryName === 'string' && categoryName.match(/^[0-9a-fA-F]{24}$/)) {
+          const found = categoryData.find(cat => {
+            const catId = cat._id || cat.id;
+            return catId === categoryName;
+          });
+          if (found) {
+            categoryName = found.name || categoryName;
+          }
+        }
+        
+        return {
+          id: product._id || product.id,
+          _id: product._id,
+          name: product.name,
+          price: product.price,
+          category: categoryName,
+          subcategory: product.subcategory,
+          description: product.description,
+          stock: product.stock,
+          img: product.img,
+          isActive: product.isActive,
+        };
+      });
+      
+      setFeaturedProducts(transformedProducts);
+    } catch (error) {
+      console.error("Error loading featured products:", error);
+      setError("Failed to load products. Please refresh the page.");
+      setFeaturedProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleExploreStore = () => {
     const token = localStorage.getItem("token");
@@ -31,8 +84,34 @@ function LandingPage() {
     navigate("/auth");
   };
 
-  const handleAdmin = () => {
-    navigate("/admin/login");
+  const handleAddToCart = (product) => {
+    // Check if user is logged in
+    const token = localStorage.getItem("token");
+    if (!token) {
+      // Redirect to login page
+      navigate("/auth");
+      return;
+    }
+
+    // Check stock
+    if (product.stock <= 0) {
+      alert("Sorry, this product is out of stock!");
+      return;
+    }
+
+    // Add to cart
+    const cartItem = {
+      id: product._id || product.id,
+      name: product.name,
+      price: product.price,
+      img: product.img,
+      stock: product.stock,
+      category: product.category,
+      quantity: 1
+    };
+    
+    cart.addToCart(cartItem, 1);
+    alert(`✅ "${product.name}" added to cart!`);
   };
 
   return (
@@ -205,6 +284,278 @@ function LandingPage() {
         </div>
       </section>
 
+      {/* Featured Products Section - Bestsellers This Week */}
+      <section id="featured" style={{
+        padding: "60px 10px",
+        background: "#faf7f2"
+      }}>
+        <div style={{
+          maxWidth: "1180px",
+          margin: "0 auto"
+        }}>
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-end",
+            marginBottom: "32px",
+            flexWrap: "wrap",
+            gap: "16px"
+          }}>
+            <div>
+              <span style={{
+                display: "inline-block",
+                background: "#b85c38",
+                color: "white",
+                padding: "6px 18px",
+                borderRadius: "999px",
+                fontSize: "0.8rem",
+                fontWeight: "bold",
+                letterSpacing: "1px",
+                textTransform: "uppercase",
+                marginBottom: "12px"
+              }}>
+                Featured Products
+              </span>
+              <h2 style={{
+                fontSize: "clamp(1.8rem, 3vw, 2.8rem)",
+                color: "#241913",
+                margin: 0,
+                fontFamily: "Georgia, serif"
+              }}>
+                Bestsellers <span style={{ color: "#b85c38" }}>This Week</span>
+              </h2>
+            </div>
+            <button 
+              onClick={handleExploreStore}
+              style={{
+                padding: "10px 24px",
+                background: "white",
+                border: "2px solid #b85c38",
+                borderRadius: "999px",
+                fontWeight: "bold",
+                color: "#b85c38",
+                cursor: "pointer",
+                fontSize: "0.95rem"
+              }}
+            >
+              View All →
+            </button>
+          </div>
+
+          {loading ? (
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+              gap: "24px"
+            }}>
+              {[1,2,3,4,5,6].map((n) => (
+                <div key={n} style={{
+                  background: "white",
+                  borderRadius: "16px",
+                  overflow: "hidden",
+                  height: "350px",
+                  animation: "pulse 1.5s ease-in-out infinite"
+                }}>
+                  <div style={{ height: "200px", background: "#f0ece6" }}></div>
+                  <div style={{ padding: "16px" }}>
+                    <div style={{ height: "20px", background: "#f0ece6", borderRadius: "8px", marginBottom: "8px" }}></div>
+                    <div style={{ height: "15px", background: "#f0ece6", borderRadius: "8px", width: "60%" }}></div>
+                    <div style={{ height: "30px", background: "#f0ece6", borderRadius: "8px", marginTop: "12px" }}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div style={{
+              textAlign: "center",
+              padding: "40px",
+              background: "white",
+              borderRadius: "16px",
+              border: "1px solid #ffe8df"
+            }}>
+              <p style={{ color: "#8d261a" }}>{error}</p>
+              <button
+                onClick={loadFeaturedProducts}
+                style={{
+                  marginTop: "12px",
+                  padding: "8px 20px",
+                  background: "#b85c38",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: "pointer"
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          ) : featuredProducts.length === 0 ? (
+            <div style={{
+              textAlign: "center",
+              padding: "40px",
+              background: "white",
+              borderRadius: "16px",
+              border: "1px dashed #ddd"
+            }}>
+              <p style={{ color: "#71635b" }}>No products available yet. Check back soon!</p>
+            </div>
+          ) : (
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+              gap: "24px"
+            }}>
+              {featuredProducts.map((product) => (
+                <article key={product.id} className="product-card" style={{
+                  transition: "all 0.3s ease",
+                  position: "relative",
+                  overflow: "hidden",
+                  background: "white",
+                  borderRadius: "16px",
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.06)"
+                }}>
+                  <div className="product-image" style={{ position: "relative" }}>
+                    <img 
+                      src={product.img || "https://via.placeholder.com/300x200?text=No+Image"} 
+                      alt={product.name}
+                      style={{
+                        transition: "transform 0.5s ease",
+                        width: "100%",
+                        height: "250px",
+                        objectFit: "cover",
+                        background: "#f9f6f0"
+                      }}
+                      onError={(e) => {
+                        e.target.src = "https://via.placeholder.com/300x200?text=No+Image";
+                      }}
+                    />
+                    <div style={{
+                      position: "absolute",
+                      top: "12px",
+                      left: "12px",
+                      display: "flex",
+                      gap: "6px",
+                      flexWrap: "wrap"
+                    }}>
+                      <span style={{
+                        display: "inline-block",
+                        padding: "4px 12px",
+                        borderRadius: "999px",
+                        background: "rgba(36, 25, 19, 0.7)",
+                        color: "white",
+                        fontSize: "0.75rem",
+                        fontWeight: "bold",
+                        backdropFilter: "blur(8px)"
+                      }}>
+                        {product.category || "Uncategorized"}
+                      </span>
+                      {product.stock === 0 && (
+                        <span style={{
+                          display: "inline-block",
+                          padding: "4px 12px",
+                          borderRadius: "999px",
+                          background: "#8d261a",
+                          color: "white",
+                          fontSize: "0.75rem",
+                          fontWeight: "bold"
+                        }}>
+                          Sold Out
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="product-body" style={{ padding: "20px" }}>
+                    <h2 style={{
+                      margin: "0 0 6px",
+                      fontSize: "1.1rem",
+                      color: "#241913",
+                      fontWeight: "bold"
+                    }}>
+                      {product.name}
+                    </h2>
+                    <p className="product-subcategory" style={{
+                      margin: "0 0 8px",
+                      color: "#b85c38",
+                      fontSize: "0.85rem",
+                      fontWeight: "600"
+                    }}>
+                      {product.subcategory || "Uncategorized"}
+                    </p>
+                    <p style={{
+                      color: "#71635b",
+                      fontSize: "0.9rem",
+                      lineHeight: "1.5",
+                      margin: "0 0 12px",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden"
+                    }}>
+                      {product.description || "No description available"}
+                    </p>
+                    
+                    <div className="product-footer" style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginTop: "16px",
+                      paddingTop: "16px",
+                      borderTop: "1px solid rgba(36, 25, 19, 0.08)"
+                    }}>
+                      <div>
+                        <div style={{
+                          fontSize: "1.25rem",
+                          fontWeight: "bold",
+                          color: "#b85c38"
+                        }}>
+                          Rs. {product.price?.toLocaleString("en-IN") || 0}
+                        </div>
+                        <div style={{
+                          fontSize: "0.75rem",
+                          color: product.stock === 0 ? "#8d261a" : "#456b55"
+                        }}>
+                          {product.stock === 0 ? "Out of stock" : `${product.stock} available`}
+                        </div>
+                      </div>
+                      <button 
+                        disabled={product.stock === 0}
+                        onClick={() => handleAddToCart(product)}
+                        style={{
+                          padding: "10px 20px",
+                          border: "none",
+                          borderRadius: "999px",
+                          background: product.stock === 0 ? "#ddd" : "#b85c38",
+                          color: product.stock === 0 ? "#999" : "white",
+                          fontWeight: "bold",
+                          cursor: product.stock === 0 ? "not-allowed" : "pointer",
+                          transition: "all 0.3s ease",
+                          fontSize: "0.9rem"
+                        }}
+                        onMouseEnter={(e) => {
+                          if (product.stock > 0) {
+                            e.target.style.background = "#8d3f25";
+                            e.target.style.transform = "scale(1.02)";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (product.stock > 0) {
+                            e.target.style.background = "#b85c38";
+                            e.target.style.transform = "scale(1)";
+                          }
+                        }}
+                      >
+                        {product.stock === 0 ? "Unavailable" : "Add to Cart"}
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* About Section */}
       <section id="about" style={{
         padding: "60px 10px",
@@ -329,118 +680,10 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* Collections Section */}
-      <section id="collections" style={{
-        padding: "60px 10px",
-        background: "#faf7f2"
-      }}>
-        <div style={{
-          maxWidth: "1180px",
-          margin: "0 auto"
-        }}>
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-end",
-            marginBottom: "32px",
-            flexWrap: "wrap",
-            gap: "16px"
-          }}>
-            <div>
-              <span style={{
-                display: "inline-block",
-                background: "#b85c38",
-                color: "white",
-                padding: "6px 18px",
-                borderRadius: "999px",
-                fontSize: "0.8rem",
-                fontWeight: "bold",
-                letterSpacing: "1px",
-                textTransform: "uppercase",
-                marginBottom: "12px"
-              }}>
-                Collections
-              </span>
-              <h2 style={{
-                fontSize: "clamp(1.8rem, 3vw, 2.8rem)",
-                color: "#241913",
-                margin: 0,
-                fontFamily: "Georgia, serif"
-              }}>
-                Shop by <span style={{ color: "#b85c38" }}>Craft</span>
-              </h2>
-            </div>
-            <button 
-              onClick={handleExploreStore}
-              style={{
-                padding: "10px 24px",
-                background: "white",
-                border: "2px solid #b85c38",
-                borderRadius: "999px",
-                fontWeight: "bold",
-                color: "#b85c38",
-                cursor: "pointer",
-                fontSize: "0.95rem"
-              }}
-            >
-              View All →
-            </button>
-          </div>
-
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-            gap: "20px"
-          }}>
-            {categories.map((category) => (
-              <article key={category.name} style={{
-                background: "white",
-                borderRadius: "16px",
-                padding: "28px 20px",
-                border: "1px solid rgba(36, 25, 19, 0.06)",
-                cursor: "pointer",
-                textAlign: "center"
-              }}
-              onClick={handleExploreStore}
-              >
-                <div style={{
-                  width: "60px",
-                  height: "60px",
-                  borderRadius: "50%",
-                  background: "#f6eadb",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "28px",
-                  margin: "0 auto 14px"
-                }}>
-                  {category.icon}
-                </div>
-                <h3 style={{
-                  margin: "0 0 6px",
-                  fontSize: "1.1rem",
-                  color: "#241913"
-                }}>
-                  {category.name}
-                </h3>
-                <p style={{
-                  margin: 0,
-                  color: "#71635b",
-                  fontSize: "0.9rem",
-                  lineHeight: "1.5"
-                }}>
-                  {category.description}
-                </p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Why Choose Us Section */}
       <section style={{
         padding: "60px 10px",
-        background: "white"
+        background: "#faf7f2"
       }}>
         <div style={{
           maxWidth: "1180px",
@@ -488,8 +731,9 @@ function LandingPage() {
               <div key={item.title} style={{
                 textAlign: "center",
                 padding: "28px 20px",
-                background: "#f9f6f0",
-                borderRadius: "16px"
+                background: "white",
+                borderRadius: "16px",
+                boxShadow: "0 2px 12px rgba(0,0,0,0.06)"
               }}>
                 <div style={{ fontSize: "36px", marginBottom: "10px" }}>{item.icon}</div>
                 <h3 style={{ margin: "0 0 6px", color: "#241913", fontSize: "1.05rem" }}>{item.title}</h3>
@@ -602,6 +846,13 @@ function LandingPage() {
           </div>
         </div>
       </section>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.6; }
+        }
+      `}</style>
     </main>
   );
 }

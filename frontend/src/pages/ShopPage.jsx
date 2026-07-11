@@ -15,15 +15,25 @@ function ShopPage() {
   
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [categoriesData, setCategoriesData] = useState([]);
+  const [subcategoriesData, setSubcategoriesData] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+
+  // Toast notification state
+  const [toast, setToast] = useState({
+    visible: false,
+    message: '',
+    isSuccess: true
+  });
 
   // Filter states
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedSubcategory, setSelectedSubcategory] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(""); // Add debounced state
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
 
   // Pagination
   const [pagination, setPagination] = useState({
@@ -32,10 +42,84 @@ function ShopPage() {
     total: 0,
   });
 
-  // Debounce timer ref
   const debounceTimerRef = useRef(null);
+  const toastTimerRef = useRef(null);
 
-  // Navigation handlers
+  // ============================================
+  // TOAST NOTIFICATION FUNCTIONS
+  // ============================================
+  
+  const showToast = (message, isSuccess = true) => {
+    // Clear any existing timer
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+
+    setToast({
+      visible: true,
+      message,
+      isSuccess
+    });
+
+    // Auto hide after 2.5 seconds
+    toastTimerRef.current = setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }));
+    }, 2500);
+  };
+
+  const hideToast = () => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToast(prev => ({ ...prev, visible: false }));
+  };
+
+  // ============================================
+  // HELPER FUNCTIONS TO RESOLVE NAMES FROM IDs
+  // ============================================
+  
+  const getCategoryName = useCallback((categoryId) => {
+    if (!categoryId) return 'Uncategorized';
+    
+    if (typeof categoryId === 'string' && !categoryId.match(/^[0-9a-fA-F]{24}$/)) {
+      return categoryId;
+    }
+    
+    const category = categoriesData.find(cat => {
+      const catId = cat._id || cat.id;
+      return catId === categoryId;
+    });
+    
+    if (category) {
+      return category.name || categoryId;
+    }
+    
+    return categoryId;
+  }, [categoriesData]);
+
+  const getSubcategoryName = useCallback((subcategoryId) => {
+    if (!subcategoryId) return 'Uncategorized';
+    
+    if (typeof subcategoryId === 'string' && !subcategoryId.match(/^[0-9a-fA-F]{24}$/)) {
+      return subcategoryId;
+    }
+    
+    const subcategory = subcategoriesData.find(sub => {
+      const subId = sub._id || sub.id;
+      return subId === subcategoryId;
+    });
+    
+    if (subcategory) {
+      return subcategory.name || subcategoryId;
+    }
+    
+    return subcategoryId;
+  }, [subcategoriesData]);
+
+  // ============================================
+  // NAVIGATION HANDLERS
+  // ============================================
+  
   const handleHome = () => {
     navigate("/");
   };
@@ -49,7 +133,7 @@ function ShopPage() {
 
   const handleCheckout = () => {
     if (cart.items.length === 0) {
-      alert("Your cart is empty! Add some items first.");
+      showToast('Your cart is empty!', false);
       return;
     }
     navigate("/checkout");
@@ -59,19 +143,19 @@ function ShopPage() {
     navigate("/orders");
   };
 
-  // Debounce search term - only update after user stops typing
+  // ============================================
+  // DEBOUNCE SEARCH
+  // ============================================
+  
   useEffect(() => {
-    // Clear previous timer
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
-    // Set new timer
     debounceTimerRef.current = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
-    }, 500); // Wait 500ms after user stops typing
+    }, 500);
 
-    // Cleanup on unmount or search change
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
@@ -79,77 +163,68 @@ function ShopPage() {
     };
   }, [searchTerm]);
 
-  // Load products when filters change (using debounced search term)
-  useEffect(() => {
-    loadProducts();
-  }, [selectedCategory, selectedSubcategory, debouncedSearchTerm, pagination.page]);
-
-  // Reset page when search or filters change
-  useEffect(() => {
-    setPagination(prev => ({ ...prev, page: 1 }));
-  }, [selectedCategory, selectedSubcategory, debouncedSearchTerm]);
-
-  // Load categories and subcategories on mount
+  // ============================================
+  // LOAD CATEGORIES & SUBCATEGORIES
+  // ============================================
+  
   useEffect(() => {
     loadCategoriesAndSubcategories();
   }, []);
 
   const loadCategoriesAndSubcategories = async () => {
     try {
+      console.log("🔄 Loading categories and subcategories...");
+      
       const [categoriesRes, subcategoriesRes] = await Promise.all([
         categoryService.getCategories(),
         categoryService.getSubcategories(),
       ]);
 
-      const categoryNames =
-        categoriesRes.data?.map((cat) => cat.name) || categoriesRes || [];
-      const subcategoryNames =
-        subcategoriesRes.data?.map((sub) => sub.name) || subcategoriesRes || [];
+      const categoryData = categoriesRes.data || categoriesRes || [];
+      const subcategoryData = subcategoriesRes.data || subcategoriesRes || [];
+      
+      console.log("📦 Categories loaded:", categoryData.length);
+      console.log("📦 Subcategories loaded:", subcategoryData.length);
+      
+      setCategoriesData(categoryData);
+      setSubcategoriesData(subcategoryData);
+      setCategoriesLoaded(true);
 
-      setCategories(
-        categoryNames.length > 0
-          ? categoryNames
-          : [
-              "Basketry",
-              "Ceramics",
-              "Textiles",
-              "Woodcraft",
-              "Wall Decor",
-              "Tableware",
-            ],
-      );
-      setSubcategories(
-        subcategoryNames.length > 0
-          ? subcategoryNames
-          : [
-              "Storage Baskets",
-              "Decor Vases",
-              "Macrame Art",
-              "Mugs",
-              "Scarves",
-              "Serving Bowls",
-            ],
-      );
+      const categoryNames = categoryData.map((cat) => cat.name || cat);
+      const subcategoryNames = subcategoryData.map((sub) => sub.name || sub);
+
+      setCategories(categoryNames.length > 0 ? categoryNames : []);
+      setSubcategories(subcategoryNames.length > 0 ? subcategoryNames : []);
+      
     } catch (error) {
       console.error("Error loading categories:", error);
-      setCategories([
+      const fallbackCategories = [
         "Basketry",
         "Ceramics",
         "Textiles",
         "Woodcraft",
         "Wall Decor",
         "Tableware",
-      ]);
-      setSubcategories([
-        "Storage Baskets",
-        "Decor Vases",
-        "Macrame Art",
-        "Mugs",
-        "Scarves",
-        "Serving Bowls",
-      ]);
+      ];
+      setCategories(fallbackCategories);
+      setCategoriesData(fallbackCategories.map(name => ({ name, _id: name })));
+      setCategoriesLoaded(true);
     }
   };
+
+  // ============================================
+  // LOAD PRODUCTS
+  // ============================================
+  
+  useEffect(() => {
+    if (categoriesLoaded) {
+      loadProducts();
+    }
+  }, [selectedCategory, selectedSubcategory, debouncedSearchTerm, pagination.page, categoriesLoaded]);
+
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, page: 1 }));
+  }, [selectedCategory, selectedSubcategory, debouncedSearchTerm]);
 
   const loadProducts = async () => {
     try {
@@ -169,7 +244,7 @@ function ShopPage() {
         filters.subcategory = selectedSubcategory;
       }
 
-      if (debouncedSearchTerm.trim()) { // Use debounced search term
+      if (debouncedSearchTerm.trim()) {
         filters.search = debouncedSearchTerm.trim();
       }
 
@@ -177,24 +252,33 @@ function ShopPage() {
 
       const response = await productService.getProducts(filters);
       const data = response.data || response || [];
-      const transformedProducts = data.map((product) => ({
-        id: product._id || product.id,
-        _id: product._id,
-        name: product.name,
-        price: product.price,
-        category: product.category,
-        subcategory: product.subcategory,
-        description: product.description,
-        stock: product.stock,
-        img: product.img,
-        images: product.images || [],
-        isActive: product.isActive,
-      }));
+      
+      const transformedProducts = data.map((product) => {
+        const categoryName = getCategoryName(product.category);
+        const subcategoryName = getSubcategoryName(product.subcategory);
+        
+        return {
+          id: product._id || product.id,
+          _id: product._id,
+          name: product.name,
+          price: product.price,
+          category: categoryName,
+          subcategory: subcategoryName,
+          description: product.description,
+          stock: product.stock,
+          img: product.img,
+          images: product.images || [],
+          isActive: product.isActive,
+          categoryId: product.category,
+          subcategoryId: product.subcategory,
+        };
+      });
 
       setProducts(transformedProducts);
       setPagination(
         response.pagination || { page: 1, totalPages: 1, total: 0 },
       );
+      
     } catch (error) {
       console.error("Error loading products:", error);
       setError("Failed to load products. Please try again.");
@@ -204,27 +288,13 @@ function ShopPage() {
     }
   };
 
-  const handlePageChange = (newPage) => {
-    setPagination((prev) => ({ ...prev, page: newPage }));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleSearchChange = (value) => {
-    setSearchTerm(value); // This triggers the debounce
-  };
-
-  const handleCategorySelect = (category) => {
-    setSelectedCategory(category);
-    setSelectedSubcategory("All");
-  };
-
-  const handleSubcategorySelect = (subcategory) => {
-    setSelectedSubcategory(subcategory);
-  };
-
+  // ============================================
+  // CART HANDLERS WITH TOAST NOTIFICATIONS
+  // ============================================
+  
   const handleAddToCart = (product) => {
     if (product.stock <= 0) {
-      alert("Sorry, this product is out of stock!");
+      showToast(`"${product.name}" is out of stock!`, false);
       return;
     }
 
@@ -239,9 +309,46 @@ function ShopPage() {
     };
     
     cart.addToCart(cartItem, 1);
+    showToast(`Product added to cart`, true);
   };
 
-  // Loading Skeleton
+  const handleRemoveFromCart = (productId) => {
+    const item = cart.items.find(i => (i.id || i._id) === productId);
+    cart.removeItem(productId);
+    showToast(`Product removed from cart`, true);
+  };
+
+  const handleDecreaseQuantity = (productId) => {
+    cart.decreaseItem(productId);
+    showToast(`Product removed from cart`, true);
+  };
+
+  // ============================================
+  // UI HANDLERS
+  // ============================================
+  
+  const handlePageChange = (newPage) => {
+    setPagination((prev) => ({ ...prev, page: newPage }));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSearchChange = (value) => {
+    setSearchTerm(value);
+  };
+
+  const handleCategorySelect = (category) => {
+    setSelectedCategory(category);
+    setSelectedSubcategory("All");
+  };
+
+  const handleSubcategorySelect = (subcategory) => {
+    setSelectedSubcategory(subcategory);
+  };
+
+  // ============================================
+  // LOADING SKELETON
+  // ============================================
+  
   if (loading && products.length === 0) {
     return (
       <main className="site-shell">
@@ -280,8 +387,47 @@ function ShopPage() {
     );
   }
 
+  // ============================================
+  // MAIN RENDER
+  // ============================================
+  
   return (
     <main className="site-shell">
+      {/* Simple Toast Notification */}
+      {toast.visible && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '30px',
+            right: '30px',
+            zIndex: 9999,
+            padding: '14px 24px',
+            borderRadius: '10px',
+            background: toast.isSuccess ? '#2f5140' : '#8d261a',
+            color: 'white',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            fontSize: '0.95rem',
+            fontWeight: '500',
+            animation: 'fadeIn 0.3s ease-out',
+            maxWidth: '400px',
+            cursor: 'pointer'
+          }}
+          onClick={hideToast}
+        >
+          {toast.message}
+          <span 
+            style={{ 
+              marginLeft: '12px', 
+              cursor: 'pointer',
+              opacity: 0.7,
+              fontSize: '16px'
+            }}
+          >
+            ✕
+          </span>
+        </div>
+      )}
+
       <SiteHeader
         cartCount={cart.count}
         onHome={handleHome}
@@ -494,7 +640,12 @@ function ShopPage() {
         </div>
       </div>
 
-      <ShoppingCart cart={cart} onCheckout={handleCheckout} />
+      <ShoppingCart 
+        cart={cart} 
+        onCheckout={handleCheckout}
+        onRemoveFromCart={handleRemoveFromCart}
+        onDecreaseQuantity={handleDecreaseQuantity}
+      />
 
       <ProductSearchFilter
         categories={categories}
@@ -681,6 +832,25 @@ function ShopPage() {
           </>
         )
       )}
+
+      {/* Toast Animation Styles */}
+      <style>{`
+        @keyframes fadeIn {
+          0% {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          100% {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.6; }
+        }
+      `}</style>
     </main>
   );
 }

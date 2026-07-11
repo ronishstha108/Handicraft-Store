@@ -1,3 +1,4 @@
+// backend/src/controllers/userController.js
 const User = require('../models/User');
 
 // @desc    Get all users
@@ -97,14 +98,34 @@ const deleteUser = async (req, res) => {
       });
     }
 
-    const user = await User.findByIdAndDelete(req.params.id);
-
-    if (!user) {
+    // Find the user to check if they are admin
+    const userToDelete = await User.findById(req.params.id);
+    
+    if (!userToDelete) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
+
+    // Prevent deleting admin accounts
+    if (userToDelete.role === 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Cannot delete admin accounts'
+      });
+    }
+
+    // Check if current user is admin
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser || currentUser.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admins can delete users'
+      });
+    }
+
+    await userToDelete.deleteOne();
 
     res.json({
       success: true,

@@ -24,7 +24,7 @@ function SiteHeader({
         <nav className="nav-links" aria-label="Main navigation">
           <a href="#top">Home</a>
           <a href="#about">About Us</a>
-          <a href="#collections">Collections</a>
+          <a href="#featured">Featured</a>  {/* Changed from Collections to Featured */}
           <a href="#contact">Contact</a>
         </nav>
       )}

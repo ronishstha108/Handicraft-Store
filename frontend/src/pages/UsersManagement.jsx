@@ -6,13 +6,29 @@ function UsersManagement() {
   const { users, deleteUser } = useAdmin();
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Get current logged-in user
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const currentUserId = currentUser?.id || currentUser?._id;
+
   const userList = users || [];
 
-  const filteredUsers = userList.filter(user =>
-    user.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter out admin users and current user (yourself)
+  const filteredUsers = userList.filter(user => {
+    // Exclude admin users
+    if (user.role === 'admin') return false;
+    
+    // Exclude yourself (current logged-in user)
+    const userId = user._id || user.id;
+    if (userId === currentUserId) return false;
+    
+    // Apply search filter
+    const search = searchTerm.toLowerCase();
+    return (
+      user.first_name?.toLowerCase().includes(search) ||
+      user.last_name?.toLowerCase().includes(search) ||
+      user.email?.toLowerCase().includes(search)
+    );
+  });
 
   const handleDelete = (userId, userName) => {
     if (window.confirm(`Are you sure you want to delete user "${userName}"?`)) {
@@ -59,13 +75,18 @@ function UsersManagement() {
           filteredUsers.map((user) => {
             const userId = user._id || user.id;
             return (
-              <div key={userId} style={{ background: "white", borderRadius: "16px", border: "1px solid rgba(36, 25, 19, 0.12)", padding: "20px" }}>
+              <div key={userId} style={{ 
+                background: "white", 
+                borderRadius: "16px", 
+                border: "1px solid rgba(36, 25, 19, 0.12)",
+                padding: "20px"
+              }}>
                 <div style={{ display: "flex", alignItems: "center", marginBottom: "16px" }}>
                   <div style={{ 
                     width: "60px", 
                     height: "60px", 
                     borderRadius: "50%", 
-                    background: "#f6eadb", 
+                    background: "#f6eadb",
                     display: "flex", 
                     alignItems: "center", 
                     justifyContent: "center", 
@@ -77,8 +98,12 @@ function UsersManagement() {
                     {user.first_name?.[0]}{user.last_name?.[0]}
                   </div>
                   <div>
-                    <h3 style={{ margin: 0, color: "#241913" }}>{user.first_name} {user.last_name}</h3>
-                    <p style={{ margin: "4px 0 0", color: "#71635b", fontSize: "0.85rem" }}>Joined: {formatDate(user.joinDate || user.createdAt)}</p>
+                    <h3 style={{ margin: 0, color: "#241913" }}>
+                      {user.first_name} {user.last_name}
+                    </h3>
+                    <p style={{ margin: "4px 0 0", color: "#71635b", fontSize: "0.85rem" }}>
+                      Joined: {formatDate(user.joinDate || user.createdAt)}
+                    </p>
                   </div>
                 </div>
                 <div style={{ marginBottom: "16px" }}>
@@ -87,6 +112,7 @@ function UsersManagement() {
                   <p style={{ margin: "8px 0", fontSize: "0.9rem" }}><strong>Total Orders:</strong> {user.totalOrders || 0}</p>
                   <p style={{ margin: "8px 0", fontSize: "0.9rem" }}><strong>Total Spent:</strong> Rs. {(user.totalSpent || 0).toLocaleString("en-IN")}</p>
                 </div>
+                
                 <button 
                   onClick={() => handleDelete(userId, `${user.first_name} ${user.last_name}`)} 
                   style={{ 
@@ -97,7 +123,14 @@ function UsersManagement() {
                     border: "none", 
                     borderRadius: "8px", 
                     fontWeight: "bold", 
-                    cursor: "pointer" 
+                    cursor: "pointer",
+                    transition: "all 0.3s ease"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.background = "#6b1e14";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.background = "#8d261a";
                   }}
                 >
                   Delete User
