@@ -75,19 +75,18 @@ const orderSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['eSewa', 'Khalti', 'Cash on Delivery', 'FonePay'],
-    default: 'eSewa'
+    enum: ['Pending', 'Khalti', 'Cash on Delivery'],
+    default: 'Pending'
   },
   paymentStatus: {
     type: String,
     enum: ['Pending', 'Paid', 'Failed', 'Refunded'],
     default: 'Pending'
   },
-  esewa_number: String,
   status: {
     type: String,
-    enum: ['Processing', 'Shipped', 'Delivered', 'Cancelled'],
-    default: 'Processing'
+    enum: ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'],
+    default: 'Pending'
   },
   notes: String,
   orderDate: {

@@ -2,11 +2,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { orderService } from "../services/orderService";
+import KhaltiPayment from "./KhaltiPayment";
 
 function CheckoutForm({ cart }) {
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showEsewaModal, setShowEsewaModal] = useState(false);
+  const [showKhaltiModal, setShowKhaltiModal] = useState(false);
+  const [orderId, setOrderId] = useState(null);
+  const [selectedPayment, setSelectedPayment] = useState(null);
   
   console.log("🛒 CheckoutForm received cart:", cart);
   console.log("🛒 Cart items:", cart?.items);
@@ -18,8 +21,6 @@ function CheckoutForm({ cart }) {
     phone: "",
     address: "",
     city: "",
-    esewa_number: "",
-    esewa_password: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -68,18 +69,6 @@ function CheckoutForm({ cart }) {
       newErrors.city = "City is required";
     }
 
-    if (!formData.esewa_number.trim()) {
-      newErrors.esewa_number = "eSewa number is required";
-    } else if (!/^[0-9]{10}$/.test(formData.esewa_number)) {
-      newErrors.esewa_number = "Please enter a valid 10-digit eSewa number";
-    }
-
-    if (!formData.esewa_password.trim()) {
-      newErrors.esewa_password = "eSewa password is required";
-    } else if (formData.esewa_password.length < 4) {
-      newErrors.esewa_password = "Password must be at least 4 characters";
-    }
-
     return newErrors;
   };
 
@@ -99,27 +88,23 @@ function CheckoutForm({ cart }) {
     return calculateSubtotal() + calculateDeliveryCharge();
   };
 
-  const handleEsewaPayment = () => {
+  // Create order and get order ID
+  const createOrder = async () => {
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-      return;
+      return null;
     }
-    setShowEsewaModal(true);
-  };
 
-  const processPayment = async () => {
     setIsProcessing(true);
 
     try {
-      // Get user info from localStorage
       const userData = JSON.parse(localStorage.getItem("user") || "{}");
       const token = localStorage.getItem("token");
       
       console.log("👤 User data:", userData);
       console.log("🔑 Token exists:", !!token);
 
-      // Prepare order data for MongoDB
       const orderData = {
         customer: {
           first_name: formData.first_name,
@@ -139,19 +124,22 @@ function CheckoutForm({ cart }) {
         subtotal: calculateSubtotal(),
         deliveryCharge: calculateDeliveryCharge(),
         total: calculateTotal(),
-        paymentMethod: "eSewa",
-        esewa_number: formData.esewa_number,
+        paymentMethod: "Pending",
         itemCount: cart.items.reduce((sum, item) => sum + item.quantity, 0),
         orderDate: new Date().toISOString(),
-        status: "Processing",
-        user: userData.id, // Add user ID for MongoDB association
+        status: "Pending",
+        user: userData.id,
+        paymentStatus: "Pending"
       };
 
       console.log("📦 Sending order to API:", orderData);
 
-      // Call the API to save to MongoDB
       const response = await orderService.createOrder(orderData);
       console.log("📡 Order API response:", response);
+
+      const newOrder = response.data || response;
+      const newOrderId = newOrder._id || newOrder.id;
+      setOrderId(newOrderId);
 
       // Save to localStorage as backup
       const existingOrders = localStorage.getItem("orderHistory");
@@ -159,24 +147,42 @@ function CheckoutForm({ cart }) {
       if (existingOrders) {
         orders = JSON.parse(existingOrders);
       }
-      
-      const newOrder = response.data || response;
       orders.unshift(newOrder);
       localStorage.setItem("orderHistory", JSON.stringify(orders));
 
-      alert(
-        `✅ Order Placed Successfully!\n\nOrder ID: #${newOrder.orderId || newOrder._id || newOrder.id}\nTotal: Rs. ${(newOrder.total || calculateTotal()).toLocaleString("en-IN")}`,
-      );
+      return newOrderId;
 
-      cart.clearCart();
-      navigate("/orders");
     } catch (error) {
       console.error("❌ Order error:", error);
       alert(`❌ Order failed: ${error.response?.data?.message || error.message}`);
-    } finally {
       setIsProcessing(false);
-      setShowEsewaModal(false);
+      return null;
     }
+  };
+
+  const handleKhaltiPayment = async () => {
+    const orderId = await createOrder();
+    if (orderId) {
+      setSelectedPayment('khalti');
+      setShowKhaltiModal(true);
+      setIsProcessing(false);
+    }
+  };
+
+  const handlePaymentSuccess = (data) => {
+    console.log('Payment successful:', data);
+    setShowKhaltiModal(false);
+    setIsProcessing(false);
+    alert(`✅ Payment Successful! Order ID: #${orderId}`);
+    cart.clearCart();
+    navigate("/orders");
+  };
+
+  const handlePaymentFailure = (error) => {
+    console.error('Payment failed:', error);
+    setShowKhaltiModal(false);
+    setIsProcessing(false);
+    alert(`❌ Payment failed: ${error.message}`);
   };
 
   const cartItems = cart?.items || [];
@@ -319,52 +325,6 @@ function CheckoutForm({ cart }) {
                 </div>
               </div>
             </fieldset>
-
-            <fieldset className="checkout-card">
-              <legend>eSewa Payment</legend>
-
-              <div className="payment-info">
-                <div className={errors.esewa_number ? "error" : ""}>
-                  <label>
-                    eSewa Number (Registered Mobile Number) *
-                    <input
-                      type="tel"
-                      name="esewa_number"
-                      value={formData.esewa_number}
-                      onChange={handleChange}
-                    />
-                  </label>
-                  {errors.esewa_number && (
-                    <span className="error-text">{errors.esewa_number}</span>
-                  )}
-                </div>
-
-                <div className={errors.esewa_password ? "error" : ""}>
-                  <label>
-                    eSewa Password *
-                    <input
-                      type="password"
-                      name="esewa_password"
-                      value={formData.esewa_password}
-                      onChange={handleChange}
-                    />
-                  </label>
-                  {errors.esewa_password && (
-                    <span className="error-text">{errors.esewa_password}</span>
-                  )}
-                </div>
-
-                <div className="payment-note">
-                  <p>
-                    💡 Your eSewa account will be charged Rs.{" "}
-                    {calculateTotal().toLocaleString("en-IN")}
-                  </p>
-                  <p style={{ fontSize: "0.9rem", marginTop: "8px" }}>
-                    Make sure you have sufficient balance in your eSewa account.
-                  </p>
-                </div>
-              </div>
-            </fieldset>
           </form>
         </div>
 
@@ -405,61 +365,100 @@ function CheckoutForm({ cart }) {
             <strong>Rs. {calculateTotal().toLocaleString("en-IN")}</strong>
           </div>
 
-          <button onClick={handleEsewaPayment} className="place-order-button">
-            Pay with eSewa • Rs. {calculateTotal().toLocaleString("en-IN")}
+          {/* Khalti Payment Button */}
+          <button 
+            onClick={handleKhaltiPayment} 
+            disabled={isProcessing}
+            style={{
+              width: '100%',
+              padding: '14px',
+              background: isProcessing ? '#999' : '#5C2D91',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              fontSize: '1.1rem',
+              fontWeight: 'bold',
+              cursor: isProcessing ? 'not-allowed' : 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              if (!isProcessing) {
+                e.target.style.background = '#7B3FAF';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isProcessing) {
+                e.target.style.background = '#5C2D91';
+              }
+            }}
+          >
+            {isProcessing ? 'Processing Order...' : `💰 Pay with Khalti • Rs. ${calculateTotal().toLocaleString("en-IN")}`}
           </button>
 
-          <p className="secure-note">🔒 Secure payment powered by eSewa</p>
+          <p className="secure-note" style={{ marginTop: '12px' }}>
+            🔒 Secure payment powered by Khalti
+          </p>
         </div>
       </div>
 
-      {/* eSewa Payment Modal */}
-      {showEsewaModal && (
-        <div className="modal-overlay" onClick={() => setShowEsewaModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>eSewa Payment</h3>
-              <button
-                className="modal-close"
-                onClick={() => setShowEsewaModal(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="payment-details">
-                <p>
-                  <strong>Account:</strong> {formData.esewa_number}
-                </p>
-                <p>
-                  <strong>Amount:</strong> Rs.{" "}
-                  {calculateTotal().toLocaleString("en-IN")}
-                </p>
-                <p>
-                  <strong>Merchant:</strong> Handicraft Store
-                </p>
-              </div>
-              <div className="payment-loading">
-                {isProcessing ? (
-                  <div className="processing">
-                    <div className="spinner"></div>
-                    <p>Processing payment...</p>
-                  </div>
-                ) : (
-                  <div className="confirm-buttons">
-                    <button onClick={processPayment} className="confirm-btn">
-                      Confirm Payment
-                    </button>
-                    <button
-                      onClick={() => setShowEsewaModal(false)}
-                      className="cancel-btn"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
+      {/* Khalti Payment Modal */}
+      {showKhaltiModal && orderId && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '24px',
+            padding: '40px',
+            maxWidth: '500px',
+            width: '100%',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+          }}>
+            <h2 style={{ textAlign: 'center', marginBottom: '20px' }}>Complete Khalti Payment</h2>
+            <p style={{ textAlign: 'center', color: '#71635b', marginBottom: '24px' }}>
+              You will be redirected to Khalti to complete your payment.
+            </p>
+            
+            <KhaltiPayment 
+              orderId={orderId}
+              totalAmount={calculateTotal()}
+              customerInfo={{
+                name: formData.first_name + ' ' + formData.last_name,
+                email: formData.email,
+                phone: formData.phone
+              }}
+              onSuccess={handlePaymentSuccess}
+              onFailure={handlePaymentFailure}
+            />
+            
+            <button
+              onClick={() => {
+                setShowKhaltiModal(false);
+                setIsProcessing(false);
+              }}
+              style={{
+                display: 'block',
+                margin: '12px auto 0',
+                padding: '8px 20px',
+                background: 'transparent',
+                border: 'none',
+                color: '#71635b',
+                cursor: 'pointer',
+                fontSize: '0.9rem'
+              }}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

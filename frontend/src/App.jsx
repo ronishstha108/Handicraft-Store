@@ -5,18 +5,18 @@ import { ShoppingCartProvider, useShoppingCart } from "./context/ShoppingCartCon
 import LandingPage from "./pages/LandingPage";
 import ShopPage from "./pages/ShopPage";
 import OrderHistory from "./pages/OrderHistory";
-import AdminPanel from "./pages/AdminPanel"; // IMPORT THIS
+import AdminPanel from "./pages/AdminPanel";
 import AdminLogin from "./components/AdminLogin";
 import AdminRoute from "./components/AdminRoute";
 import Auth from "./pages/Auth";
 import CheckoutForm from "./components/CheckoutForm";
 import ProtectedRoute from "./components/ProtectedRoute";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentFailure from "./pages/PaymentFailure";
 import "./App.css";
 
-// Wrapper for CheckoutForm to provide cart
 const CheckoutWrapper = () => {
   const cart = useShoppingCart();
-  console.log("🛒 CheckoutWrapper cart:", cart);
   return <CheckoutForm cart={cart} />;
 };
 
@@ -29,26 +29,30 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/admin/login" element={<AdminLogin />} />
+          
+          {/* Payment Routes */}
+          <Route path="/payment-success" element={<PaymentSuccess />} />
+          <Route path="/payment-failure" element={<PaymentFailure />} />
+          <Route path="/payment-khalti-callback" element={<PaymentSuccess />} /> {/* Khalti callback */}
 
-          {/* Protected Routes - Require Login */}
+          {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
             <Route path="/shop" element={<ShopPage />} />
             <Route path="/checkout" element={<CheckoutWrapper />} />
             <Route path="/orders" element={<OrderHistory />} />
           </Route>
 
-          {/* Admin Routes - Protected with Admin check */}
+          {/* Admin Routes */}
           <Route 
             path="/admin/*" 
             element={
               <AdminRoute>
-                <AdminPanel /> {/* USE AdminPanel HERE */}
+                <AdminPanel />
               </AdminRoute>
             } 
           />
 
-          {/* 404 Fallback */}
-          <Route path="*" element={<Navigate to="/" />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </ShoppingCartProvider>
     </AdminProvider>
