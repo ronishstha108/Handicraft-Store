@@ -5,6 +5,7 @@ import ShoppingCart from "../components/ShoppingCart";
 import ProductSearchFilter from "../components/ProductSearchFilter";
 import SiteHeader from "../components/SiteHeader";
 import ProductItemCard from "../components/ProductItemCard";
+import ProductDetailModal from "../components/ProductDetailModal";
 import { productService } from "../services/productService";
 import { categoryService } from "../services/categoryService";
 import { useShoppingCart } from "../context/ShoppingCartContext";
@@ -21,6 +22,7 @@ function ShopPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   // Toast notification state
   const [toast, setToast] = useState({
@@ -91,10 +93,10 @@ function ShopPage() {
     });
     
     if (category) {
-      return category.name || categoryId;
+      return category.name || 'Uncategorized';
     }
     
-    return categoryId;
+    return 'Uncategorized';
   }, [categoriesData]);
 
   const getSubcategoryName = useCallback((subcategoryId) => {
@@ -110,10 +112,10 @@ function ShopPage() {
     });
     
     if (subcategory) {
-      return subcategory.name || subcategoryId;
+      return subcategory.name || 'Uncategorized';
     }
     
-    return subcategoryId;
+    return 'Uncategorized';
   }, [subcategoriesData]);
 
   // ============================================
@@ -701,6 +703,7 @@ function ShopPage() {
                   key={product._id || product.id}
                   product={product}
                   onAddToCart={handleAddToCart}
+                  onViewDetails={setSelectedProduct}
                 />
               ))}
             </section>
@@ -851,6 +854,17 @@ function ShopPage() {
           50% { opacity: 0.6; }
         }
       `}</style>
+
+      {selectedProduct && (
+        <ProductDetailModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          onAddToCart={(product) => {
+            handleAddToCart(product);
+            setSelectedProduct(null);
+          }}
+        />
+      )}
     </main>
   );
 }

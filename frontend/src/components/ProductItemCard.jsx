@@ -1,10 +1,15 @@
 // frontend/src/components/ProductItemCard.jsx
-function ProductItemCard({ product, onAddToCart }) {
+function ProductItemCard({ product, onAddToCart, onViewDetails }) {
   const isOutOfStock = product.stock === 0;
   const isLowStock = product.stock > 0 && product.stock <= 3;
 
-  const handleAddToCart = () => {
+  const handleAddToCart = (e) => {
+    e.stopPropagation();
     onAddToCart(product);
+  };
+
+  const handleViewDetails = () => {
+    if (onViewDetails) onViewDetails(product);
   };
 
   // Handle image error
@@ -14,15 +19,26 @@ function ProductItemCard({ product, onAddToCart }) {
   };
 
   return (
-    <article className="product-card" style={{
-      transition: "all 0.3s ease",
-      position: "relative",
-      overflow: "hidden",
-      background: "white",
-      borderRadius: "16px",
-      boxShadow: "0 2px 12px rgba(0,0,0,0.06)"
-    }}>
-      <div className="product-image" style={{ position: "relative" }}>
+    <article
+      className="product-card"
+      onClick={handleViewDetails}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleViewDetails();
+        }
+      }}
+      style={{
+        transition: "all 0.3s ease",
+        position: "relative",
+        overflow: "hidden",
+        background: "white",
+        borderRadius: "16px",
+        boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+        cursor: "pointer"
+      }}>      <div className="product-image" style={{ position: "relative" }}>
         <img 
           src={product.img || 'https://via.placeholder.com/300x300?text=No+Image'} 
           alt={product.name || 'Product'} 
