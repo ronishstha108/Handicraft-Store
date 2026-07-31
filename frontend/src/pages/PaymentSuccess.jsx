@@ -17,10 +17,15 @@ function PaymentSuccess() {
   useEffect(() => {
     const verifyPayment = async () => {
       try {
-        // Use pidx for Khalti or transactionId for eSewa
-        const id = pidx || transactionId;
-        if (id) {
-          const response = await paymentService.getTransactionStatus(id);
+        if (pidx) {
+          // pidx present: this is a real Khalti redirect. Call lookup so the
+          // backend verifies with Khalti and updates the order accordingly.
+          const response = await paymentService.lookupKhaltiPayment(pidx);
+          if (response.success) {
+            setTransaction(response.data);
+          }
+        } else if (transactionId) {
+          const response = await paymentService.getTransactionStatus(transactionId);
           if (response.success) {
             setTransaction(response.data);
           }
@@ -39,6 +44,11 @@ function PaymentSuccess() {
 
     verifyPayment();
   }, [transactionId, pidx, status]);
+
+  const rawStatus = transaction?.status; // Khalti's own status string, e.g. 'Completed', 'User canceled', 'Expired', 'Pending'
+  const isSuccess = rawStatus === 'Completed' || (!rawStatus && status === 'success');
+  const isPending = rawStatus === 'Pending' || rawStatus === 'Initiated';
+  const isFailed = !isSuccess && !isPending;
 
   if (loading) {
     return (
@@ -81,7 +91,7 @@ function PaymentSuccess() {
       <div style={{
         width: '80px',
         height: '80px',
-        background: '#e8f3ef',
+        background: isSuccess ? '#e8f3ef' : isPending ? '#fff8e7' : '#ffe8df',
         borderRadius: '50%',
         display: 'flex',
         alignItems: 'center',
@@ -89,12 +99,18 @@ function PaymentSuccess() {
         margin: '0 auto 20px',
         fontSize: '40px'
       }}>
-        ✅
+        {isSuccess ? '✅' : isPending ? '⏳' : '❌'}
       </div>
       
-      <h1 style={{ color: '#241913', marginBottom: '8px' }}>Payment Successful!</h1>
+      <h1 style={{ color: '#241913', marginBottom: '8px' }}>
+        {isSuccess ? 'Payment Successful!' : isPending ? 'Payment Pending' : 'Payment Not Completed'}
+      </h1>
       <p style={{ color: '#71635b', marginBottom: '24px' }}>
-        Your order has been confirmed and will be processed shortly.
+        {isSuccess
+          ? 'Your order has been confirmed and will be processed shortly.'
+          : isPending
+          ? "We're still waiting for confirmation from Khalti. Check your order status again shortly."
+          : 'Your payment was cancelled or did not go through, so this order has been cancelled and any reserved stock has been released.'}
       </p>
       
       <div style={{
@@ -114,7 +130,12 @@ function PaymentSuccess() {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0' }}>
           <span style={{ color: '#71635b' }}>Status:</span>
-          <span style={{ color: '#2f5140', fontWeight: 'bold' }}>{transaction?.status || 'COMPLETE'}</span>
+          <span style={{
+            color: isSuccess ? '#2f5140' : isPending ? '#8a6d1d' : '#8d261a',
+            fontWeight: 'bold'
+          }}>
+            {rawStatus || 'COMPLETE'}
+          </span>
         </div>
       </div>
 

@@ -49,7 +49,7 @@ function OrderDetailsModal({ order, onClose }) {
             <p><strong>Name:</strong> {order.customer?.first_name} {order.customer?.last_name}</p>
             <p><strong>Email:</strong> {order.customer?.email}</p>
             <p><strong>Phone:</strong> {order.customer?.phone}</p>
-            <p><strong>Address:</strong> {order.customer?.address}, {order.customer?.city}</p>
+            <p><strong>Address:</strong> {order.customer?.address}{order.customer?.city ? `, ${order.customer.city}` : ""}</p>
           </div>
         </div>
 

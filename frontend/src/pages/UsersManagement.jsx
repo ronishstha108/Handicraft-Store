@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useAdmin } from '../context/AdminContext';
 
 function UsersManagement() {
-  const { users, deleteUser } = useAdmin();
+  const { users, deleteUser, refreshData, loading } = useAdmin();
   const [searchTerm, setSearchTerm] = useState("");
 
   // Get current logged-in user
@@ -53,7 +53,7 @@ function UsersManagement() {
           <h2 style={{ margin: 0, color: "#241913" }}>Users Management</h2>
           <p style={{ margin: "4px 0 0", color: "#71635b" }}>Manage registered customers</p>
         </div>
-        <div>
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
           <input 
             type="text" 
             placeholder="Search users..." 
@@ -61,6 +61,22 @@ function UsersManagement() {
             onChange={(e) => setSearchTerm(e.target.value)} 
             style={{ padding: "8px 16px", border: "1px solid #ddd", borderRadius: "8px", width: "250px" }} 
           />
+          <button
+            onClick={refreshData}
+            disabled={loading}
+            title="Fetch the latest registered users from the server"
+            style={{
+              padding: "8px 16px",
+              border: "1px solid #ddd",
+              borderRadius: "8px",
+              background: loading ? "#f2f2f2" : "white",
+              color: "#241913",
+              cursor: loading ? "not-allowed" : "pointer",
+              fontWeight: "bold"
+            }}
+          >
+            {loading ? "Refreshing..." : "🔄 Refresh"}
+          </button>
         </div>
       </div>
 

@@ -26,7 +26,7 @@ export const AdminProvider = ({ children }) => {
   const [dataLoaded, setDataLoaded] = useState(false);
 
   // Load all data
-  const loadData = async () => {
+  const loadData = async (forceRefresh = false) => {
     try {
       // Check if admin is logged in
       const token = localStorage.getItem("token");
@@ -44,8 +44,8 @@ export const AdminProvider = ({ children }) => {
       
       console.log("🔄 Loading admin data...");
       
-      // Try to load from cache first
-      const cachedData = localStorage.getItem("adminCachedData");
+      // Try to load from cache first (skipped entirely on a forced refresh)
+      const cachedData = !forceRefresh ? localStorage.getItem("adminCachedData") : null;
       const cacheTimestamp = localStorage.getItem("adminCacheTimestamp");
       const cacheAge = cacheTimestamp ? Date.now() - parseInt(cacheTimestamp) : Infinity;
       const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -363,6 +363,9 @@ export const AdminProvider = ({ children }) => {
     }
   };
 
+  // Force a fresh fetch from the server, bypassing the cache entirely
+  const refreshData = () => loadData(true);
+
   const value = {
     products,
     orders,
@@ -373,6 +376,7 @@ export const AdminProvider = ({ children }) => {
     error,
     dataLoaded,
     loadData,
+    refreshData,
     addProduct,
     updateProduct,
     deleteProduct,

@@ -4,15 +4,16 @@ import { useAdmin } from '../context/AdminContext';
 import OrderDetailsModal from '../components/OrderDetailsModal';
 
 function OrdersManagement() {
-  const { orders, updateOrderStatus, deleteOrder } = useAdmin();
+  const { orders, updateOrderStatus, deleteOrder, refreshData, loading } = useAdmin();
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [filter, setFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
-  const statuses = ["Processing", "Shipped", "Delivered", "Cancelled"];
+  const statuses = ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"];
 
   const getStatusColor = (status) => {
     switch(status) {
+      case "Pending": return { bg: "#f5f0eb", color: "#8a7c72" };
       case "Processing": return { bg: "#fff8e7", color: "#d8a540" };
       case "Shipped": return { bg: "#e8f3ef", color: "#456b55" };
       case "Delivered": return { bg: "#e0f0e8", color: "#2f5140" };
@@ -30,7 +31,10 @@ function OrdersManagement() {
     return matchesFilter && matchesSearch;
   });
 
-  const handleStatusChange = (orderId, newStatus) => {
+  const handleStatusChange = (orderId, newStatus, currentStatus) => {
+    if (currentStatus === 'Delivered') {
+      return; // already blocked by the disabled dropdown, but just in case
+    }
     if (window.confirm(`Change order #${orderId} status to "${newStatus}"?`)) {
       updateOrderStatus(orderId, newStatus);
     }
@@ -61,6 +65,22 @@ function OrdersManagement() {
             <option value="all">All Orders</option>
             {statuses.map(status => <option key={status} value={status}>{status}</option>)}
           </select>
+          <button
+            onClick={refreshData}
+            disabled={loading}
+            title="Fetch the latest orders from the server"
+            style={{
+              padding: "8px 16px",
+              border: "1px solid #ddd",
+              borderRadius: "8px",
+              background: loading ? "#f2f2f2" : "white",
+              color: "#241913",
+              cursor: loading ? "not-allowed" : "pointer",
+              fontWeight: "bold"
+            }}
+          >
+            {loading ? "Refreshing..." : "🔄 Refresh"}
+          </button>
         </div>
       </div>
 
@@ -90,7 +110,22 @@ function OrdersManagement() {
                     <td style={{ padding: "16px" }}>{formatDate(order.orderDate)}</td>
                     <td style={{ padding: "16px", textAlign: "right", fontWeight: "bold" }}>Rs. {(order.total || 0).toLocaleString("en-IN")}</td>
                     <td style={{ padding: "16px", textAlign: "center" }}>
-                      <select value={order.status} onChange={(e) => handleStatusChange(orderId, e.target.value)} style={{ padding: "6px 12px", borderRadius: "8px", border: `1px solid ${statusStyle.color}`, background: statusStyle.bg, color: statusStyle.color, fontWeight: "bold", cursor: "pointer" }}>
+                      <select
+                        value={order.status}
+                        onChange={(e) => handleStatusChange(orderId, e.target.value, order.status)}
+                        disabled={order.status === 'Delivered'}
+                        title={order.status === 'Delivered' ? 'Delivered orders are final and cannot be changed' : undefined}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "8px",
+                          border: `1px solid ${statusStyle.color}`,
+                          background: statusStyle.bg,
+                          color: statusStyle.color,
+                          fontWeight: "bold",
+                          cursor: order.status === 'Delivered' ? "not-allowed" : "pointer",
+                          opacity: order.status === 'Delivered' ? 0.75 : 1
+                        }}
+                      >
                         {statuses.map(status => <option key={status} value={status}>{status}</option>)}
                       </select>
                     </td>

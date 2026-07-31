@@ -26,11 +26,15 @@ function LandingPage() {
       const response = await productService.getProducts({ limit: 6, page: 1 });
       const data = response.data || response || [];
       
-      // Get categories for name resolution
-      const categoriesRes = await categoryService.getCategories();
+      // Get categories and subcategories for name resolution
+      const [categoriesRes, subcategoriesRes] = await Promise.all([
+        categoryService.getCategories(),
+        categoryService.getSubcategories(),
+      ]);
       const categoryData = categoriesRes.data || categoriesRes || [];
+      const subcategoryData = subcategoriesRes.data || subcategoriesRes || [];
       
-      // Transform products with category names
+      // Transform products with category and subcategory names
       const transformedProducts = data.map((product) => {
         let categoryName = product.category;
         if (categoryName && typeof categoryName === 'string' && categoryName.match(/^[0-9a-fA-F]{24}$/)) {
@@ -38,9 +42,16 @@ function LandingPage() {
             const catId = cat._id || cat.id;
             return catId === categoryName;
           });
-          if (found) {
-            categoryName = found.name || categoryName;
-          }
+          categoryName = found ? (found.name || 'Uncategorized') : 'Uncategorized';
+        }
+
+        let subcategoryName = product.subcategory;
+        if (subcategoryName && typeof subcategoryName === 'string' && subcategoryName.match(/^[0-9a-fA-F]{24}$/)) {
+          const found = subcategoryData.find(sub => {
+            const subId = sub._id || sub.id;
+            return subId === subcategoryName;
+          });
+          subcategoryName = found ? (found.name || 'Uncategorized') : 'Uncategorized';
         }
         
         return {
@@ -49,7 +60,7 @@ function LandingPage() {
           name: product.name,
           price: product.price,
           category: categoryName,
-          subcategory: product.subcategory,
+          subcategory: subcategoryName,
           description: product.description,
           stock: product.stock,
           img: product.img,
@@ -841,7 +852,7 @@ function LandingPage() {
               fontSize: "0.85rem",
               margin: 0
             }}>
-              © 2025 Handicraft Store. All rights reserved. Made with ❤️ by Ronish
+              © 2026 Handicraft Store. All rights reserved. Made with ❤️ by Ronish
             </p>
           </div>
         </div>

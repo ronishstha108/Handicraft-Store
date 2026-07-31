@@ -1,6 +1,18 @@
 // backend/src/models/Order.js
 const mongoose = require('mongoose');
 
+// Tiny internal model used purely to hand out atomically-incrementing
+// sequence numbers (one counter per day, keyed by _id like "order-260725").
+// $inc via findOneAndUpdate is atomic at the database level, so two
+// concurrent checkouts can never be handed the same number — and unlike
+// counting existing Order documents, this never goes "backwards" if an
+// order is later deleted. Defined inline here (not a separate file) since
+// it only exists to support order ID generation below.
+const Counter = mongoose.models.Counter || mongoose.model('Counter', new mongoose.Schema({
+  _id: { type: String, required: true },
+  seq: { type: Number, default: 0 }
+}));
+
 const orderSchema = new mongoose.Schema({
   orderId: {
     type: String,
@@ -35,7 +47,7 @@ const orderSchema = new mongoose.Schema({
     },
     city: {
       type: String,
-      required: true
+      required: false
     }
   },
   items: [{
@@ -100,14 +112,25 @@ const orderSchema = new mongoose.Schema({
 });
 
 // Generate order ID before saving (fallback)
-orderSchema.pre('save', async function(next) {
+orderSchema.pre('validate', async function(next) {
   if (!this.orderId) {
-    const date = new Date();
-    const year = date.getFullYear().toString().slice(-2);
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const count = await this.constructor.countDocuments() + 1;
-    this.orderId = `ORD-${year}${month}${day}-${String(count).padStart(4, '0')}`;
+    try {
+      const date = new Date();
+      const year = date.getFullYear().toString().slice(-2);
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+
+      const counterId = `order-${year}${month}${day}`;
+      const counter = await Counter.findOneAndUpdate(
+        { _id: counterId },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+      );
+
+      this.orderId = `ORD-${year}${month}${day}-${String(counter.seq).padStart(4, '0')}`;
+    } catch (err) {
+      return next(err);
+    }
   }
   next();
 });

@@ -294,11 +294,13 @@ function ShopPage() {
   // CART HANDLERS WITH TOAST NOTIFICATIONS
   // ============================================
   
-  const handleAddToCart = (product) => {
+  const handleAddToCart = (product, quantity = 1) => {
     if (product.stock <= 0) {
       showToast(`"${product.name}" is out of stock!`, false);
       return;
     }
+
+    const safeQuantity = Math.min(Math.max(parseInt(quantity, 10) || 1, 1), product.stock);
 
     const cartItem = {
       id: product._id || product.id,
@@ -307,11 +309,14 @@ function ShopPage() {
       img: product.img,
       stock: product.stock,
       category: product.category,
-      quantity: 1
+      quantity: safeQuantity
     };
     
-    cart.addToCart(cartItem, 1);
-    showToast(`Product added to cart`, true);
+    cart.addToCart(cartItem, safeQuantity);
+    showToast(
+      safeQuantity > 1 ? `${safeQuantity} × "${product.name}" added to cart` : `Product added to cart`,
+      true
+    );
   };
 
   const handleRemoveFromCart = (productId) => {
@@ -859,8 +864,8 @@ function ShopPage() {
         <ProductDetailModal
           product={selectedProduct}
           onClose={() => setSelectedProduct(null)}
-          onAddToCart={(product) => {
-            handleAddToCart(product);
+          onAddToCart={(product, quantity) => {
+            handleAddToCart(product, quantity);
             setSelectedProduct(null);
           }}
         />

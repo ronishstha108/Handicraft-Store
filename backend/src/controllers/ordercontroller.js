@@ -3,15 +3,8 @@ const Order = require('../models/Order');
 const Product = require('../models/Product');
 const User = require('../models/User');
 
-// Generate Order ID helper function
-const generateOrderId = async () => {
-  const date = new Date();
-  const year = date.getFullYear().toString().slice(-2);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const count = await Order.countDocuments() + 1;
-  return `ORD-${year}${month}${day}-${String(count).padStart(4, '0')}`;
-};
+// Order IDs are generated automatically (atomically, per-day) by the
+// pre('save') hook in models/Order.js — no need to generate one here.
 
 // @desc    Create order
 // @route   POST /api/orders
@@ -23,10 +16,7 @@ const createOrder = async (req, res) => {
     const orderData = req.body;
     orderData.user = req.user.id;
     
-    // Generate order ID
-    orderData.orderId = await generateOrderId();
-    
-    console.log("📦 Order data with ID:", orderData);
+    console.log("📦 Order data (orderId will be assigned on save):", orderData);
 
     // Validate products and update stock
     for (const item of orderData.items) {
@@ -121,9 +111,14 @@ const cancelOrder = async (req, res) => {
     }
 
     // Update order status to Cancelled
+    // (findByIdAndUpdate, not order.save(), so we don't re-validate unrelated
+    // legacy fields like an old 'eSewa' paymentMethod value on older orders)
+    await Order.findByIdAndUpdate(orderId, {
+      status: 'Cancelled',
+      cancelledAt: new Date()
+    });
     order.status = 'Cancelled';
     order.cancelledAt = new Date();
-    await order.save();
 
     // Restore stock for all items
     for (const item of order.items) {
@@ -265,13 +260,25 @@ const updateOrderStatus = async (req, res) => {
       });
     }
 
+    // Once an order is Delivered, its status is final — items have already
+    // reached the customer, so it can't be reverted or cancelled afterward.
+    if (order.status === 'Delivered' && status !== 'Delivered') {
+      return res.status(400).json({
+        success: false,
+        message: 'This order has already been delivered and cannot be changed.'
+      });
+    }
+
     // Update status
     order.status = status;
+    const updateFields = { status };
     if (status === 'Delivered') {
       order.deliveredAt = new Date();
+      updateFields.deliveredAt = order.deliveredAt;
     }
     if (status === 'Cancelled') {
       order.cancelledAt = new Date();
+      updateFields.cancelledAt = order.cancelledAt;
       // Restore stock if cancelled
       for (const item of order.items) {
         await Product.findByIdAndUpdate(item.product, {
@@ -280,7 +287,9 @@ const updateOrderStatus = async (req, res) => {
       }
     }
 
-    await order.save();
+    // findByIdAndUpdate (not order.save()) so we don't re-validate unrelated
+    // legacy fields like an old 'eSewa' paymentMethod value on older orders
+    await Order.findByIdAndUpdate(req.params.id, updateFields);
 
     res.json({
       success: true,

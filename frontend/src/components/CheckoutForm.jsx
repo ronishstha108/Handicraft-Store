@@ -1,5 +1,5 @@
 // frontend/src/components/CheckoutForm.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { orderService } from "../services/orderService";
 import KhaltiPayment from "./KhaltiPayment";
@@ -20,8 +20,26 @@ function CheckoutForm({ cart }) {
     email: "",
     phone: "",
     address: "",
-    city: "",
   });
+
+  // Prefill from the logged-in user's saved details (still editable if they want to change anything)
+  useEffect(() => {
+    try {
+      const userData = JSON.parse(localStorage.getItem("user") || "{}");
+      if (userData && (userData.first_name || userData.email)) {
+        setFormData((prev) => ({
+          ...prev,
+          first_name: userData.first_name || prev.first_name,
+          last_name: userData.last_name || prev.last_name,
+          email: userData.email || prev.email,
+          phone: userData.phone || prev.phone,
+          address: userData.address || prev.address,
+        }));
+      }
+    } catch (err) {
+      console.error("Could not prefill checkout form from saved user data:", err);
+    }
+  }, []);
 
   const [errors, setErrors] = useState({});
 
@@ -63,10 +81,6 @@ function CheckoutForm({ cart }) {
 
     if (!formData.address.trim()) {
       newErrors.address = "Address is required";
-    }
-
-    if (!formData.city.trim()) {
-      newErrors.city = "City is required";
     }
 
     return newErrors;
@@ -112,7 +126,6 @@ function CheckoutForm({ cart }) {
           email: formData.email,
           phone: formData.phone,
           address: formData.address,
-          city: formData.city,
         },
         items: cart.items.map((item) => ({
           product: item.id,
@@ -306,21 +319,6 @@ function CheckoutForm({ cart }) {
                   </label>
                   {errors.address && (
                     <span className="error-text">{errors.address}</span>
-                  )}
-                </div>
-
-                <div className={errors.city ? "error" : ""}>
-                  <label>
-                    City *
-                    <input
-                      type="text"
-                      name="city"
-                      value={formData.city}
-                      onChange={handleChange}
-                    />
-                  </label>
-                  {errors.city && (
-                    <span className="error-text">{errors.city}</span>
                   )}
                 </div>
               </div>

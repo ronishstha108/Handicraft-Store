@@ -1,5 +1,13 @@
 // frontend/src/components/ProductDetailModal.jsx
+import { useState, useEffect } from "react";
+
 function ProductDetailModal({ product, onClose, onAddToCart }) {
+  const [quantity, setQuantity] = useState(1);
+
+  useEffect(() => {
+    setQuantity(1);
+  }, [product]);
+
   if (!product) return null;
 
   const isOutOfStock = product.stock === 0;
@@ -10,8 +18,26 @@ function ProductDetailModal({ product, onClose, onAddToCart }) {
     e.target.alt = 'Image not available';
   };
 
+  const clampQuantity = (value) => {
+    if (Number.isNaN(value)) return 1;
+    return Math.min(Math.max(value, 1), product.stock);
+  };
+
+  const handleQuantityChange = (e) => {
+    const value = parseInt(e.target.value, 10);
+    setQuantity(clampQuantity(value));
+  };
+
+  const incrementQuantity = () => {
+    setQuantity((q) => clampQuantity(q + 1));
+  };
+
+  const decrementQuantity = () => {
+    setQuantity((q) => clampQuantity(q - 1));
+  };
+
   const handleAddToCart = () => {
-    onAddToCart(product);
+    onAddToCart(product, quantity);
   };
 
   return (
@@ -146,6 +172,86 @@ function ProductDetailModal({ product, onClose, onAddToCart }) {
             {product.description || 'No description available for this product.'}
           </p>
 
+          {!isOutOfStock && (
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '0.85rem',
+                fontWeight: 'bold',
+                color: '#4c4039',
+                marginBottom: '8px'
+              }}>
+                Quantity
+              </label>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <button
+                  type="button"
+                  onClick={decrementQuantity}
+                  disabled={quantity <= 1}
+                  aria-label="Decrease quantity"
+                  style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '10px',
+                    border: '1px solid #ddd',
+                    background: quantity <= 1 ? '#f2f2f2' : 'white',
+                    color: '#4c4039',
+                    fontSize: '1.1rem',
+                    cursor: quantity <= 1 ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  −
+                </button>
+
+                <input
+                  type="number"
+                  min={1}
+                  max={product.stock}
+                  value={quantity}
+                  onChange={handleQuantityChange}
+                  onFocus={(e) => e.target.select()}
+                  onClick={(e) => e.target.select()}
+                  aria-label="Quantity"
+                  style={{
+                    width: '70px',
+                    height: '38px',
+                    textAlign: 'center',
+                    borderRadius: '10px',
+                    border: '1px solid #ddd',
+                    fontSize: '1rem'
+                  }}
+                />
+
+                <button
+                  type="button"
+                  onClick={incrementQuantity}
+                  disabled={quantity >= product.stock}
+                  aria-label="Increase quantity"
+                  style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '10px',
+                    border: '1px solid #ddd',
+                    background: quantity >= product.stock ? '#f2f2f2' : 'white',
+                    color: '#4c4039',
+                    fontSize: '1.1rem',
+                    cursor: quantity >= product.stock ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  +
+                </button>
+
+                <span style={{ fontSize: '0.8rem', color: '#8a7c72' }}>
+                  ({product.stock} available)
+                </span>
+              </div>
+            </div>
+          )}
+
           <button
             disabled={isOutOfStock}
             onClick={handleAddToCart}
@@ -162,7 +268,7 @@ function ProductDetailModal({ product, onClose, onAddToCart }) {
               transition: 'all 0.3s ease'
             }}
           >
-            {isOutOfStock ? 'Unavailable' : 'Add to Cart'}
+            {isOutOfStock ? 'Unavailable' : `Add ${quantity} to Cart`}
           </button>
         </div>
       </div>
