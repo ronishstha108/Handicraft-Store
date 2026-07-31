@@ -14,7 +14,7 @@ function AdminPanel() {
   const navigate = useNavigate();
   const { loading, error, dataLoaded, loadData, products, orders, users, categories, subcategories } = useAdmin();
   const [currentPage, setCurrentPage] = useState("dashboard");
-
+  console.log("COnsole Test")
   // Load data only if not loaded yet
   useEffect(() => {
     if (!dataLoaded) {
